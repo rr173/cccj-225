@@ -1,0 +1,11 @@
+{
+  "consumer": "auditor",
+  "rules": [
+    {"id": "a1", "tag": "pii", "action": "deny", "priority": 50,
+     "reason": "PII denied by default for audit"},
+    {"id": "a2", "path": "customer_profile.full_name", "action": "allow", "priority": 60,
+     "reason": "explicit higher-priority exception: names may be audited"},
+    {"id": "a3", "tag": "pii", "action": "allow", "priority": 70,
+     "reason": "broad tag-level allow; must NOT lift the deny (not an explicit path rule)"}
+  ]
+}

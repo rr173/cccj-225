@@ -1,0 +1,13 @@
+{
+  "consumer": "auditor",
+  "purpose": "audit",
+  "datasets": [
+    {"name": "customers",
+     "group_keys": [],
+     "fields": [
+       {"name": "full_name", "source": "customer_profile.full_name"},
+       {"name": "email", "source": "customer_profile.contact.email"},
+       {"name": "segment", "source": "customer_profile.segment"}
+     ]}
+  ]
+}

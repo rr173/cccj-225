@@ -1,0 +1,11 @@
+{
+  "consumer": "marketing",
+  "rules": [
+    {"id": "m1", "path": "customer_profile.contact", "action": "deny", "priority": 10},
+    {"id": "m2", "path": "customer_profile.contact.email", "action": "mask", "priority": 20,
+     "mask_style": "email_domain"},
+    {"id": "m3", "path": "customer_profile.id_number", "action": "deny", "priority": 90},
+    {"id": "mX", "path": "customer_profile.id_number", "action": "allow", "priority": 90,
+     "reason": "collides with m3 at equal priority and specificity -> must be a conflict, never file order"}
+  ]
+}

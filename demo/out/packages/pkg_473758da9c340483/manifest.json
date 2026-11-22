@@ -1,0 +1,195 @@
+{
+  "compiler_attestation": {
+    "note": "compiler self-attestation; verifiers MUST NOT trust this",
+    "self_check": "passed"
+  },
+  "consumer": "fraud_analyst",
+  "datasets": [
+    {
+      "base_table": "transactions",
+      "columns": [
+        {
+          "action": "allow",
+          "lineage": [
+            "transactions.txn_id"
+          ],
+          "matched_rules": [],
+          "name": "txn_id",
+          "reason": "no matching policy rule; default allow (permitted only because the field carries no sensitive tag)",
+          "transform": "transactions.\"txn_id\""
+        },
+        {
+          "action": "allow",
+          "lineage": [
+            "transactions.txn_time"
+          ],
+          "matched_rules": [],
+          "name": "txn_time",
+          "reason": "no matching policy rule; default allow (permitted only because the field carries no sensitive tag)",
+          "transform": "transactions.\"txn_time\""
+        },
+        {
+          "action": "allow",
+          "lineage": [
+            "transactions.channel"
+          ],
+          "matched_rules": [],
+          "name": "channel",
+          "reason": "no matching policy rule; default allow (permitted only because the field carries no sensitive tag)",
+          "transform": "transactions.\"channel\""
+        },
+        {
+          "action": "allow",
+          "lineage": [
+            "transactions.merchant_id"
+          ],
+          "matched_rules": [],
+          "name": "merchant_id",
+          "reason": "no matching policy rule; default allow (permitted only because the field carries no sensitive tag)",
+          "transform": "transactions.\"merchant_id\""
+        },
+        {
+          "action": "allow",
+          "lineage": [
+            "transactions.amount"
+          ],
+          "matched_rules": [
+            "f4"
+          ],
+          "name": "amount",
+          "reason": "matched rule f4 (allow, priority 20, path 'transactions.amount')",
+          "transform": "transactions.\"amount\""
+        },
+        {
+          "action": "allow",
+          "lineage": [
+            "customer_profile.customer_id"
+          ],
+          "matched_rules": [],
+          "name": "customer_id",
+          "reason": "no matching policy rule; default allow (permitted only because the field carries no sensitive tag)",
+          "transform": "customer_profile.\"customer_id\""
+        },
+        {
+          "action": "mask",
+          "lineage": [
+            "customer_profile.full_name"
+          ],
+          "matched_rules": [
+            "f1"
+          ],
+          "name": "full_name",
+          "reason": "matched rule f1 (mask, priority 10, tag 'pii')",
+          "transform": "substr(md5(cast(customer_profile.\"full_name\" as varchar)), 1, 10)"
+        },
+        {
+          "action": "allow",
+          "lineage": [
+            "customer_profile.contact.email"
+          ],
+          "matched_rules": [
+            "f2"
+          ],
+          "name": "email",
+          "reason": "matched rule f2 (allow, priority 30, path 'customer_profile.contact.email')",
+          "transform": "customer_profile.\"contact\"['email']"
+        },
+        {
+          "action": "allow",
+          "lineage": [
+            "customer_profile.region_code",
+            "region.region_name"
+          ],
+          "matched_rules": [],
+          "name": "region_label",
+          "reason": "derived field inherits the strictest restriction of its inputs: customer_profile.region_code -> allow (default allow); region.region_name -> allow (default allow)",
+          "transform": "concat(customer_profile.\"region_code\", '-', region.\"region_name\")"
+        }
+      ],
+      "file": "txn_enriched.parquet",
+      "group_keys": [],
+      "joins": [
+        "txn_cust",
+        "cust_region"
+      ],
+      "name": "txn_enriched"
+    }
+  ],
+  "excluded_outputs": [
+    "id_number",
+    "risk_label",
+    "tier"
+  ],
+  "forbidden_paths": [
+    "customer_profile.id_number",
+    "region.tier"
+  ],
+  "format": "delivery-package/1",
+  "identity": {
+    "consumer": "fraud_analyst",
+    "lineage_version": "83d0bc3e8d62a40944883c7e29fc562d3bc87d4fc67bfb46cff0e852e803ce54",
+    "policy_version": "cfffe7645c3d41a61dce331e57dcb400fd2f36ee065704ddf625f4d67d9b18c5",
+    "projection_version": "1e82e082ca92740a44c2c5610e90946ea445b8c622ea48fa9e3d5c3e701a3ace",
+    "purpose": "fraud",
+    "source": {
+      "tables": {
+        "customer_profile": {
+          "hash": "1083739914137302302",
+          "rows": 12
+        },
+        "region": {
+          "hash": "9741265031756473305",
+          "rows": 4
+        },
+        "transactions": {
+          "hash": "2451532622539425108",
+          "rows": 40
+        }
+      },
+      "version": "v1"
+    }
+  },
+  "lineage_version": "83d0bc3e8d62a40944883c7e29fc562d3bc87d4fc67bfb46cff0e852e803ce54",
+  "package_id": "pkg_473758da9c340483",
+  "policy_version": "cfffe7645c3d41a61dce331e57dcb400fd2f36ee065704ddf625f4d67d9b18c5",
+  "projection_version": "1e82e082ca92740a44c2c5610e90946ea445b8c622ea48fa9e3d5c3e701a3ace",
+  "purpose": "fraud",
+  "scanned_columns": [
+    "customer_profile.contact.email",
+    "customer_profile.customer_id",
+    "customer_profile.full_name",
+    "customer_profile.region_code",
+    "region.region_code",
+    "region.region_name",
+    "transactions.amount",
+    "transactions.channel",
+    "transactions.customer_id",
+    "transactions.merchant_id",
+    "transactions.txn_id",
+    "transactions.txn_time"
+  ],
+  "source": {
+    "tables": {
+      "customer_profile": {
+        "hash": "1083739914137302302",
+        "rows": 12
+      },
+      "region": {
+        "hash": "9741265031756473305",
+        "rows": 4
+      },
+      "transactions": {
+        "hash": "2451532622539425108",
+        "rows": 40
+      }
+    },
+    "version": "v1"
+  },
+  "stats": {
+    "datasets": {
+      "txn_enriched": {
+        "rows": 40
+      }
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "consumer": "marketing",
+  "purpose": "analytics",
+  "datasets": [
+    {"name": "customers",
+     "group_keys": [],
+     "fields": [
+       {"name": "customer_id", "source": "customer_profile.customer_id"},
+       {"name": "email_masked", "source": "customer_profile.contact.email"},
+       {"name": "city", "source": "customer_profile.address.city"},
+       {"name": "segment", "source": "customer_profile.segment"},
+       {"name": "region_label", "derived": "region_label"},
+       {"name": "risk_label", "derived": "risk_label"}
+     ]},
+    {"name": "amount_by_region",
+     "group_keys": ["customer_profile.region_code"],
+     "fields": [
+       {"name": "region_code", "source": "customer_profile.region_code"},
+       {"name": "txn_count", "kind": "aggregate", "stat": "count"},
+       {"name": "total_amount", "kind": "aggregate", "stat": "sum", "of": "transactions.amount"},
+       {"name": "avg_amount", "kind": "aggregate", "stat": "avg", "of": "transactions.amount"}
+     ]}
+  ]
+}

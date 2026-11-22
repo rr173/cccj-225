@@ -1,0 +1,4 @@
+[
+  {"name": "cyc_a", "expression": "cyc_b + 1", "inputs": ["cyc_b"]},
+  {"name": "cyc_b", "expression": "cyc_a + 1", "inputs": ["cyc_a"]}
+]

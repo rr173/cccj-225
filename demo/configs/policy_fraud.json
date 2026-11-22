@@ -1,0 +1,16 @@
+{
+  "consumer": "fraud_analyst",
+  "rules": [
+    {"id": "f1", "tag": "pii", "action": "mask", "priority": 10,
+     "reason": "PII masked by default for fraud work"},
+    {"id": "f2", "path": "customer_profile.contact.email", "action": "allow", "priority": 30,
+     "purpose": "fraud",
+     "reason": "analysts may read email for active fraud cases"},
+    {"id": "f3", "path": "customer_profile.id_number", "action": "deny", "priority": 90,
+     "reason": "government id never leaves the lake"},
+    {"id": "f4", "path": "transactions.amount", "action": "allow", "priority": 20,
+     "reason": "row-level amounts are required for fraud investigation"},
+    {"id": "f5", "tag": "internal", "action": "deny", "priority": 15,
+     "reason": "internal-only attributes stay in the lake"}
+  ]
+}

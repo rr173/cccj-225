@@ -1,0 +1,22 @@
+{
+  "consumer": "fraud_analyst",
+  "purpose": "fraud",
+  "datasets": [
+    {"name": "txn_enriched",
+     "group_keys": [],
+     "fields": [
+       {"name": "txn_id", "source": "transactions.txn_id"},
+       {"name": "txn_time", "source": "transactions.txn_time"},
+       {"name": "channel", "source": "transactions.channel"},
+       {"name": "merchant_id", "source": "transactions.merchant_id"},
+       {"name": "amount", "source": "transactions.amount"},
+       {"name": "customer_id", "source": "customer_profile.customer_id"},
+       {"name": "full_name", "source": "customer_profile.full_name"},
+       {"name": "email", "source": "customer_profile.contact.email"},
+       {"name": "region_label", "derived": "region_label"},
+       {"name": "id_number", "source": "customer_profile.id_number"},
+       {"name": "tier", "source": "region.tier"},
+       {"name": "risk_label", "derived": "risk_label"}
+     ]}
+  ]
+}

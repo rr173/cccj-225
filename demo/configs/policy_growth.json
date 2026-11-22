@@ -1,0 +1,7 @@
+{
+  "consumer": "growth",
+  "rules": [
+    {"id": "g1", "path": "transactions.amount", "action": "allow", "priority": 10,
+     "reason": "growth may see amounts"}
+  ]
+}

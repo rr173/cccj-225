@@ -1,0 +1,12 @@
+{
+  "consumer": "growth",
+  "purpose": "analytics",
+  "datasets": [
+    {"name": "x",
+     "group_keys": [],
+     "fields": [
+       {"name": "segment", "source": "customer_profile.segment"},
+       {"name": "id_number", "source": "customer_profile.id_number"}
+     ]}
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "consumer": "marketing",
+  "rules": [
+    {"id": "m1", "path": "customer_profile.contact", "action": "deny", "priority": 10,
+     "reason": "contact details are not needed for analytics"},
+    {"id": "m2", "path": "customer_profile.contact.email", "action": "mask", "priority": 20,
+     "mask_style": "email_domain",
+     "reason": "hashed local part + visible domain for segmentation"},
+    {"id": "m3", "path": "customer_profile.id_number", "action": "deny", "priority": 90,
+     "reason": "government id never leaves the lake"},
+    {"id": "m4", "tag": "pii", "action": "mask", "priority": 5,
+     "reason": "default PII protection"},
+    {"id": "m5", "path": "transactions.amount", "action": "aggregate", "priority": 30,
+     "group_keys": ["customer_profile.region_code"], "stats": ["count", "sum", "avg"],
+     "reason": "amounts only as regional aggregates"},
+    {"id": "m6", "path": "region.tier", "action": "deny", "priority": 40,
+     "via": ["cust_region"],
+     "reason": "internal tier must not leave via the customer->region join path"},
+    {"id": "m7", "path": "customer_profile.address", "action": "deny", "priority": 10,
+     "reason": "street address not needed"},
+    {"id": "m8", "path": "customer_profile.address.city", "action": "allow", "priority": 20,
+     "reason": "city-level geo allowed"}
+  ]
+}

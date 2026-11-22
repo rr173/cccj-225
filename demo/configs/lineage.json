@@ -1,0 +1,18 @@
+[
+  {"name": "region_label",
+   "expression": "concat(customer_profile.region_code, '-', region.region_name)",
+   "inputs": ["customer_profile.region_code", "region.region_name"],
+   "via": ["cust_region"]},
+  {"name": "amount_bucket",
+   "expression": "case when transactions.amount >= 1000 then 'high' when transactions.amount >= 100 then 'mid' else 'low' end",
+   "inputs": ["transactions.amount"]},
+  {"name": "risk_label",
+   "expression": "concat(customer_profile.id_number, ':', cast(transactions.amount as varchar))",
+   "inputs": ["customer_profile.id_number", "transactions.amount"]},
+  {"name": "mystery_score",
+   "expression": "customer_profile.loyalty_score * 2",
+   "inputs": ["customer_profile.loyalty_score"]},
+  {"name": "shadow_ratio",
+   "expression": "transactions.amount / 100",
+   "inputs": ["customer_profile.segment"]}
+]
