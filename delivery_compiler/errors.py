@@ -43,3 +43,14 @@ class PackageExistsError(DeliveryError):
 
 class VerificationError(DeliveryError):
     """Independent verification failed."""
+
+
+class HistoryError(DeliveryError):
+    """Consumer-side history store error.
+
+    Raised for unsupported package bindings, missing files/columns, primary-key
+    violations, revision conflicts (reused revision with new content, or a
+    never-ingested revision below the current one) and similar load/show
+    failures. A failed load never consumes an ingestion sequence number and
+    never leaves partial state behind.
+    """

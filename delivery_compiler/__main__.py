@@ -1,13 +1,16 @@
-"""CLI: python -m delivery_compiler <compile|preview|generate|verify|read>"""
+"""CLI: python -m delivery_compiler <compile|preview|generate|verify|read|history-load|history-show>"""
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 
 from .common import dump_json, load_json
 from .compiler import Plan, compile_plan, format_decisions
 from .errors import DeliveryError
 from .generator import generate
+from .history import connect as history_connect
+from .history import load_package, show_history
 from .reader import read_package
 from .schema import SourceSchema
 from .verifier import verify_package
@@ -43,6 +46,28 @@ def main(argv=None):
     p.add_argument("--package", required=True)
     p.add_argument("--consumer", required=True)
 
+    p = sub.add_parser("history-load",
+                       help="ingest one delivered package into the customer "
+                            "history store")
+    p.add_argument("--db", required=True, help="history DuckDB file")
+    p.add_argument("--package", required=True, help="delivery package directory")
+    p.add_argument("--date", required=True, help="business date YYYY-MM-DD")
+    p.add_argument("--revision", required=True, type=int,
+                   help="positive integer revision of --date")
+
+    p = sub.add_parser("history-show",
+                       help="replay one customer's roster states over a date "
+                            "range")
+    p.add_argument("--db", required=True, help="history DuckDB file")
+    p.add_argument("--customer-id", required=True, type=int)
+    p.add_argument("--start", required=True, help="range start YYYY-MM-DD "
+                                                  "(inclusive)")
+    p.add_argument("--end", required=True, help="range end YYYY-MM-DD "
+                                                "(exclusive)")
+    p.add_argument("--upto", type=int, default=None,
+                   help="only use ingestions with seq <= upto "
+                        "(default: latest; 0 = nothing ingested yet)")
+
     args = ap.parse_args(argv)
     try:
         if args.cmd in ("compile", "preview", "generate"):
@@ -71,6 +96,22 @@ def main(argv=None):
                 print("   " + " | ".join(ds["columns"]))
                 for row in ds["rows"][:20]:
                     print("   " + " | ".join(str(v) for v in row))
+        elif args.cmd == "history-load":
+            con = history_connect(args.db)
+            try:
+                result = load_package(con, args.package, args.date,
+                                      args.revision)
+            finally:
+                con.close()
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        elif args.cmd == "history-show":
+            con = history_connect(args.db, read_only=True)
+            try:
+                result = show_history(con, args.customer_id, args.start,
+                                      args.end, args.upto)
+            finally:
+                con.close()
+            print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except DeliveryError as e:
         print(f"error: {type(e).__name__}: {e}", file=sys.stderr)

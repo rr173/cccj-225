@@ -15,11 +15,15 @@ delivery_compiler/          # 库 + CLI
   generator.py              # 生成：固定源版本、列投影流式执行、不可变包
   verifier.py               # 独立验证器（不导入编译器逻辑，自行重算一切）
   reader.py                 # 读取接口（绑定消费者身份）
-  __main__.py               # CLI: compile | preview | generate | verify | read
+  history.py                # 消费者侧客户历史库（history-load / history-show）
+  __main__.py               # CLI: compile | preview | generate | verify | read | history-load | history-show
 demo/
   make_source.py            # 构造 customer_profile / transactions / region 三表（v1/v2）
   configs/                  # 策略、血缘、投影（JSON）
   run_demo.py               # 端到端演示（含篡改攻击与版本变化）
+  history_demo.py           # 报表复现小样本（客户历史库）
+tests/
+  test_history.py           # 客户历史库可复跑测试
 ```
 
 ## 语义要点
@@ -80,4 +84,83 @@ python3 -m delivery_compiler read --package demo/out/packages/<pkg_id> --consume
 
 ```bash
 python3 demo/run_demo.py
+```
+
+## 消费者侧客户历史库（history-load / history-show）
+
+市场团队每天收到一份客户交付包；包会迟到、乱序、被更正（同一业务日期的更高
+修订）。历史库消费**已交付的包**（不重新编译策略、不访问源湖、不改动包），
+既保留最新更正后的历史，也能按"当时已收到的批次"复现旧报表看到的客户状态。
+
+- 只支持 `delivery-package/1` 的 `marketing` 包及其 `customers` 数据集；从
+  manifest 定位 Parquet，其他数据集一律不读。只入库 `customer_id`（BIGINT，
+  唯一且非 NULL）与 `city`、`segment`、`region_label`（可 NULL）。包已由上游
+  验证，这里只检查本功能必要的绑定、文件、实际列类型与主键；空快照合法。
+- 每个包是当天**完整名单**：已出现过的客户若缺席，表示他从当天起不在名单中
+  （既不保留上次值，也不是"属性全空但在名单"——后者是合法且不同的状态）。
+- 每次成功收录返回从 1 开始递增的入库序号。日期可乱序到达；同一天只有更高
+  修订能替代有效名单。字节相同（manifest 与对应 Parquet）的重送返回原序号、
+  不改变任何状态；复用旧修订却换内容、或提交未收录过且低于当前修订的请求，
+  均报错。收录记录、当天生效名单、回看历史在同一事务提交；错误不消耗序号、
+  不留部分更新。重开库后查询不再需要原始交付包。
+
+```bash
+# 收录一个交付包（库不存在则创建）
+python3 -m delivery_compiler history-load --db history.duckdb \
+  --package demo/out/packages/<pkg_id> --date 2024-01-02 --revision 1
+# => {"seq": 4, "status": "ingested", ...}   重送同字节包 => {"seq": 4, "status": "duplicate"}
+
+# 回看某客户在 [start, end) 的名单状态；--upto 为截止入库序号
+# （默认最新；0 表示尚未收录任何包）
+python3 -m delivery_compiler history-show --db history.duckdb \
+  --customer-id 1001 --start 2024-01-01 --end 2024-01-06 --upto 3
+```
+
+`history-show` 仅用截至 `--upto` 各日期的最高已收录修订解释历史：某日的名单
+持续有效至下一个已收录的业务日期，首份之前视作不在名单中。输出为按开始日期
+排序、裁剪到请求范围并合并相邻相同状态的 JSON 区间；`present: false`（不在
+名单）与 `present: true` 加三个属性严格区分，值没变的已收录日不会截断区间；
+后收到的包不改变过去序号下的查询结果。
+
+### 局部性：修订老日期不回放全部历史
+
+每次入库只读取：本次名单、变更日的原有效名单、相邻前后有效日期的名单（行级
+差异比较），再按受影响客户定点读写变更日与下一有效日的历史边界——不扫描其他
+天的名单，不重建整段历史。回看则直接按 `(customer_id, valid_from)` 主键定位该
+客户的历史边界，不逐日重读名单。
+
+核对方式（无需新增诊断命令）：库函数接受外部连接，包一层记录每条 SQL 的连接
+即可从实际读写路径核对——
+
+```python
+from delivery_compiler import history_connect, load_package, show_history
+
+class Spy:
+    def __init__(self, con): self._con, self.sql = con, []
+    def execute(self, sql, params=None):
+        self.sql.append(sql)
+        return self._con.execute(sql, params) if params else self._con.execute(sql)
+    def __getattr__(self, k): return getattr(self._con, k)
+
+con = Spy(history_connect("history.duckdb"))
+load_package(con, "path/to/package", "2024-01-02", 2)
+# con.sql 中可见：read_parquet 只扫本次包；rosters 只以
+# business_date ∈ {变更日, 前一有效日, 后一有效日} 过滤（diff 用变更日或前一日
+# 的整份名单，前后邻日按 customer_id 点查）；history 的 UPDATE/INSERT 只落在
+# valid_from ∈ {变更日, 后一有效日} 且 customer_id ∈ 受影响集合
+show_history(con, 1001, "2024-01-01", "2024-01-06")
+# con.sql 中可见：仅一条对 history 的 customer_id 点查，不读 rosters、不逐日扫描
+```
+
+也可用 DuckDB 自带 profiler 复核单条语句的实际扫描：`PRAGMA
+enable_profiling='json'; PRAGMA profile_output='/tmp/show.json'` 后执行一次
+`show_history`，profile 中只有一处对 `history` 表、带 `customer_id` 过滤的扫描。
+
+### 测试与演示
+
+```bash
+python3 -m unittest discover -s tests -v   # 可复跑测试（含报表复现情形）
+python3 demo/history_demo.py               # 小样本演示：先收 1/3/5 日、补 2 日、
+                                           # 更正 2 日、空日包、重开库、幂等重送、
+                                           # 重复主键拒绝
 ```
