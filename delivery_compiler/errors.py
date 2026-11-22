@@ -37,6 +37,16 @@ class SourceDriftError(DeliveryError):
     """The source no longer matches the pinned version the plan was compiled against."""
 
 
+class RowKeyError(DeliveryError):
+    """A ``_row_keys`` declaration is missing/incomplete or violates a key guarantee.
+
+    Raised when a business table has no declared stable row key, a declared
+    key column does not exist, any key value is NULL, or a composite key
+    combination is not unique. Error messages name tables and columns only;
+    they never embed key values or other source data.
+    """
+
+
 class PackageExistsError(DeliveryError):
     """A package directory already exists with different content (packages are immutable)."""
 

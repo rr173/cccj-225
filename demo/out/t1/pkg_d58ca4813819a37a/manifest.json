@@ -69,7 +69,17 @@
       "joins": [
         "cust_region"
       ],
-      "name": "customers"
+      "name": "customers",
+      "row_lineage": {
+        "file": "customers.row_lineage.jsonl",
+        "format": "row-lineage/1",
+        "sha256": "d85e82e14751af5e712fb85118ce04e1735661b71229d8c43d4d20ddacf86620"
+      },
+      "sha256": "f9e551133e924e9d7b7cee9b3dd77cdd754a10e4b2397a65878cecf9448dd18f",
+      "table_chain": [
+        "customer_profile",
+        "region"
+      ]
     },
     {
       "base_table": "transactions",
@@ -124,7 +134,17 @@
       "joins": [
         "txn_cust"
       ],
-      "name": "amount_by_region"
+      "name": "amount_by_region",
+      "row_lineage": {
+        "file": "amount_by_region.row_lineage.jsonl",
+        "format": "row-lineage/1",
+        "sha256": "825cc52160832dd568942572c4a416fbcc38fc023cadd6c11bad08fca9347e8b"
+      },
+      "sha256": "191cf3818922e0e64f52556e633e437e8990b07c7df5fb564f26fa1cbd117bb5",
+      "table_chain": [
+        "transactions",
+        "customer_profile"
+      ]
     }
   ],
   "excluded_outputs": [
@@ -167,6 +187,23 @@
   "policy_version": "e2791df7bc14480453557c6515a354a1b120f10ac194445ea6c15687fc970885",
   "projection_version": "e5f18606ecb58eb497ed35c53c286bc3265a27ebfe1a06843b47b2643abb7a33",
   "purpose": "analytics",
+  "row_key_declarations": {
+    "customer_profile": {
+      "columns": [
+        "customer_id"
+      ]
+    },
+    "region": {
+      "columns": [
+        "region_code"
+      ]
+    },
+    "transactions": {
+      "columns": [
+        "txn_id"
+      ]
+    }
+  },
   "scanned_columns": [
     "customer_profile.address.city",
     "customer_profile.contact.email",
@@ -176,7 +213,8 @@
     "region.region_code",
     "region.region_name",
     "transactions.amount",
-    "transactions.customer_id"
+    "transactions.customer_id",
+    "transactions.txn_id"
   ],
   "source": {
     "tables": {
@@ -199,9 +237,13 @@
     "datasets": {
       "amount_by_region": {
         "groups": 4,
+        "lineage_entries": 4,
+        "lineage_source_refs": 51,
         "rows": 4
       },
       "customers": {
+        "lineage_entries": 12,
+        "lineage_source_refs": 24,
         "rows": 12
       }
     }

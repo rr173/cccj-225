@@ -108,7 +108,12 @@
         "cust_region"
       ],
       "name": "txn_enriched",
-      "sql": "SELECT transactions.\"txn_id\" AS \"txn_id\", transactions.\"txn_time\" AS \"txn_time\", transactions.\"channel\" AS \"channel\", transactions.\"merchant_id\" AS \"merchant_id\", transactions.\"amount\" AS \"amount\", customer_profile.\"customer_id\" AS \"customer_id\", substr(md5(cast(customer_profile.\"full_name\" as varchar)), 1, 10) AS \"full_name\", customer_profile.\"contact\"['email'] AS \"email\", concat(customer_profile.\"region_code\", '-', region.\"region_name\") AS \"region_label\" FROM \"transactions\" AS transactions LEFT JOIN \"customer_profile\" AS customer_profile ON transactions.\"customer_id\" = customer_profile.\"customer_id\" LEFT JOIN \"region\" AS region ON customer_profile.\"region_code\" = region.\"region_code\""
+      "sql": "SELECT transactions.\"txn_id\" AS \"txn_id\", transactions.\"txn_time\" AS \"txn_time\", transactions.\"channel\" AS \"channel\", transactions.\"merchant_id\" AS \"merchant_id\", transactions.\"amount\" AS \"amount\", customer_profile.\"customer_id\" AS \"customer_id\", substr(md5(cast(customer_profile.\"full_name\" as varchar)), 1, 10) AS \"full_name\", customer_profile.\"contact\"['email'] AS \"email\", concat(customer_profile.\"region_code\", '-', region.\"region_name\") AS \"region_label\" FROM \"transactions\" AS transactions LEFT JOIN \"customer_profile\" AS customer_profile ON transactions.\"customer_id\" = customer_profile.\"customer_id\" LEFT JOIN \"region\" AS region ON customer_profile.\"region_code\" = region.\"region_code\"",
+      "table_chain": [
+        "transactions",
+        "customer_profile",
+        "region"
+      ]
     }
   ],
   "decisions": [

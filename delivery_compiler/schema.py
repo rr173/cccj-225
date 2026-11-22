@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 
 import duckdb
 
-from .errors import DanglingReferenceError
+from .errors import DanglingReferenceError, RowKeyError
 
 SENSITIVE_TAGS = frozenset({"pii", "gov_id", "financial"})
 
@@ -70,6 +70,7 @@ class SourceSchema:
         self.top_columns = {}   # table -> [top-level column names]
         self.relations = []     # list[Relation]
         self.table_hashes = {}  # table -> {"rows": n, "hash": str}
+        self.row_keys = {}      # business table -> [stable row-key column names, ordinal order]
 
     # -- loading -----------------------------------------------------------
     @classmethod
@@ -113,6 +114,9 @@ class SourceSchema:
             if tt not in self.tables or tc not in self.top_columns.get(tt, []):
                 raise DanglingReferenceError(f"relation '{name}': dangling endpoint {tt}.{tc}")
             self.relations.append(Relation(name, ft, fc, tt, tc))
+        # stable row-key declarations (_row_keys): every business table must
+        # declare a non-empty set of existing, non-NULL, uniquely-valued keys
+        self.row_keys = self._load_row_keys(con, tables)
         # pinned content hashes (order-independent per-row hash)
         for t in tables:
             cols = self.top_columns[t]
@@ -122,6 +126,67 @@ class SourceSchema:
                 f'SELECT count(*), coalesce(bit_xor(hash({expr})), 0) FROM "{t}"').fetchone()
             self.table_hashes[t] = {"rows": int(n), "hash": str(h)}
         return self
+
+    def _load_row_keys(self, con, tables):
+        present = {r[0] for r in con.execute(
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_schema = 'main' AND table_name = '_row_keys'").fetchall()}
+        if not present:
+            raise RowKeyError(
+                "source is missing the '_row_keys' declaration table: every "
+                "business table must declare its stable row-key column(s)")
+        decls = con.execute(
+            "SELECT table_name, column_name, key_ordinal FROM _row_keys").fetchall()
+        by_table = {}
+        for tname, cname, ordinal in decls:
+            if tname not in self.tables:
+                raise RowKeyError(
+                    f"_row_keys declares keys for unknown business table {tname!r}")
+            by_table.setdefault(tname, []).append((int(ordinal), cname))
+        missing = [t for t in tables if t not in by_table]
+        if missing:
+            raise RowKeyError(
+                f"_row_keys is incomplete: no row-key declaration for table(s) "
+                f"{sorted(missing)}")
+        row_keys = {}
+        for t in tables:
+            entries = by_table[t]
+            ordinals = [o for o, _ in entries]
+            if len(set(ordinals)) != len(ordinals):
+                raise RowKeyError(
+                    f"_row_keys for table {t!r} has duplicate key_ordinal values")
+            cols = [c for _, c in sorted(entries)]
+            if not cols:
+                raise RowKeyError(
+                    f"_row_keys for table {t!r} declares no key columns")
+            if len(set(cols)) != len(cols):
+                raise RowKeyError(
+                    f"_row_keys for table {t!r} declares a key column more than once")
+            for c in cols:
+                if c not in self.top_columns[t]:
+                    raise RowKeyError(
+                        f"_row_keys for table {t!r} names unknown column {c!r}")
+            n_rows = con.execute(f'SELECT count(*) FROM "{t}"').fetchone()[0]
+            nulls = con.execute(
+                f'SELECT count(*) FROM "{t}" WHERE '
+                + " OR ".join(f'"{c}" IS NULL' for c in cols)).fetchone()[0]
+            if nulls:
+                raise RowKeyError(
+                    f"row key of table {t!r} on columns {cols} has {nulls} row(s) "
+                    f"with NULL key values; stable row keys must be non-NULL")
+            distinct = con.execute(
+                f'SELECT count(*) FROM (SELECT DISTINCT '
+                + ", ".join(f'"{c}"' for c in cols) + f' FROM "{t}")').fetchone()[0]
+            if distinct != n_rows:
+                raise RowKeyError(
+                    f"row key of table {t!r} on columns {cols} is not unique: "
+                    f"{n_rows} rows but only {distinct} distinct key combinations")
+            row_keys[t] = cols
+        extra = sorted(set(by_table) - set(tables))
+        if extra:  # defensive: declarations for non-business tables
+            raise RowKeyError(
+                f"_row_keys declares keys for unknown business table(s) {extra}")
+        return row_keys
 
     def _register(self, fields, table, rel, dtype):
         path = f"{table}." + ".".join(rel)

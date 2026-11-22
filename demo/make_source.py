@@ -31,6 +31,15 @@ RELATIONS = [
     ("cust_region", "customer_profile", "region_code", "region", "region_code"),
 ]
 
+# Stable business row-key declarations: every business table names the
+# existing, non-NULL, unique column(s) that identify its rows inside a pinned
+# source snapshot. Physical rowid / scan order are never used as identity.
+ROW_KEYS = {
+    "customer_profile": ["customer_id"],
+    "transactions": ["txn_id"],
+    "region": ["region_code"],
+}
+
 DOMAINS = ["gmail.com", "yahoo.com", "example.org", "corp.net"]
 CITIES = {"R1": ("Springfield", "01101"), "R2": ("Austin", "73301"),
           "R3": ("Hangzhou", "310000"), "R4": ("Berlin", "10115")}
@@ -99,6 +108,12 @@ def build(db_path, version):
     con.execute("CREATE TABLE _relations (name VARCHAR, from_table VARCHAR, "
                 "from_column VARCHAR, to_table VARCHAR, to_column VARCHAR)")
     con.executemany("INSERT INTO _relations VALUES (?, ?, ?, ?, ?)", RELATIONS)
+    con.execute("CREATE TABLE _row_keys (table_name VARCHAR, column_name VARCHAR, "
+                "key_ordinal INTEGER)")
+    con.executemany(
+        "INSERT INTO _row_keys VALUES (?, ?, ?)",
+        [(t, c, i) for t, cols in ROW_KEYS.items()
+         for i, c in enumerate(cols)])
     con.close()
     print(f"built {db_path} (version={version}, customers={n_customers}, "
           f"transactions={n_txn})")

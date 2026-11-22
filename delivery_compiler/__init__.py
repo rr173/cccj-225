@@ -11,22 +11,22 @@ from .compiler import Plan, compile_plan, format_decisions
 from .errors import (CyclicLineageError, DeliveryError, DanglingReferenceError,
                      HistoryError, InvalidProjectionError,
                      OutputNameConflictError, PackageExistsError,
-                     PolicyConflictError, SourceDriftError,
+                     PolicyConflictError, RowKeyError, SourceDriftError,
                      UncoveredSensitiveError, UnresolvableLineageError,
                      VerificationError)
 from .generator import generate
 from .history import connect as history_connect
 from .history import load_package, show_history
-from .reader import read_package
+from .reader import lookup_row_lineage, read_package
 from .schema import SourceSchema
 from .verifier import verify_package
 
 __all__ = [
     "Plan", "compile_plan", "format_decisions", "generate", "verify_package",
-    "read_package", "SourceSchema",
+    "read_package", "lookup_row_lineage", "SourceSchema",
     "history_connect", "load_package", "show_history",
     "DeliveryError", "PolicyConflictError", "DanglingReferenceError",
     "CyclicLineageError", "UnresolvableLineageError", "OutputNameConflictError",
     "UncoveredSensitiveError", "InvalidProjectionError", "SourceDriftError",
-    "PackageExistsError", "VerificationError", "HistoryError",
+    "PackageExistsError", "VerificationError", "HistoryError", "RowKeyError",
 ]

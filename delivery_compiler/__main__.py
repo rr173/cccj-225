@@ -11,7 +11,7 @@ from .errors import DeliveryError
 from .generator import generate
 from .history import connect as history_connect
 from .history import load_package, show_history
-from .reader import read_package
+from .reader import lookup_row_lineage, read_package
 from .schema import SourceSchema
 from .verifier import verify_package
 
@@ -45,6 +45,16 @@ def main(argv=None):
     p = sub.add_parser("read", help="read a package as its bound consumer")
     p.add_argument("--package", required=True)
     p.add_argument("--consumer", required=True)
+
+    p = sub.add_parser("lineage",
+                       help="offline lookup of one output row's source "
+                            "tables and row keys (no source DB needed)")
+    p.add_argument("--package", required=True)
+    p.add_argument("--dataset", required=True)
+    p.add_argument("--row-ref", help="locate by row_ref mapping identifier")
+    p.add_argument("--values",
+                   help="JSON object of exact published field values, e.g. "
+                        "'{\"customer_id\": 1}'")
 
     p = sub.add_parser("history-load",
                        help="ingest one delivered package into the customer "
@@ -96,6 +106,11 @@ def main(argv=None):
                 print("   " + " | ".join(ds["columns"]))
                 for row in ds["rows"][:20]:
                     print("   " + " | ".join(str(v) for v in row))
+        elif args.cmd == "lineage":
+            values = json.loads(args.values) if args.values else None
+            hits = lookup_row_lineage(args.package, args.dataset,
+                                      row_ref=args.row_ref, values=values)
+            print(json.dumps(hits, ensure_ascii=False, indent=2))
         elif args.cmd == "history-load":
             con = history_connect(args.db)
             try:

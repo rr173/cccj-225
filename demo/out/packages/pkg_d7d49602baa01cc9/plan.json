@@ -65,7 +65,11 @@
         "cust_region"
       ],
       "name": "customers",
-      "sql": "SELECT customer_profile.\"customer_id\" AS \"customer_id\", concat('u_', substr(md5(cast(customer_profile.\"contact\"['email'] as varchar)), 1, 8), '@', split_part(cast(customer_profile.\"contact\"['email'] as varchar), '@', 2)) AS \"email_masked\", customer_profile.\"address\"['city'] AS \"city\", customer_profile.\"segment\" AS \"segment\", concat(customer_profile.\"region_code\", '-', region.\"region_name\") AS \"region_label\" FROM \"customer_profile\" AS customer_profile LEFT JOIN \"region\" AS region ON customer_profile.\"region_code\" = region.\"region_code\""
+      "sql": "SELECT customer_profile.\"customer_id\" AS \"customer_id\", concat('u_', substr(md5(cast(customer_profile.\"contact\"['email'] as varchar)), 1, 8), '@', split_part(cast(customer_profile.\"contact\"['email'] as varchar), '@', 2)) AS \"email_masked\", customer_profile.\"address\"['city'] AS \"city\", customer_profile.\"segment\" AS \"segment\", concat(customer_profile.\"region_code\", '-', region.\"region_name\") AS \"region_label\" FROM \"customer_profile\" AS customer_profile LEFT JOIN \"region\" AS region ON customer_profile.\"region_code\" = region.\"region_code\"",
+      "table_chain": [
+        "customer_profile",
+        "region"
+      ]
     },
     {
       "base_table": "transactions",
@@ -120,7 +124,11 @@
         "txn_cust"
       ],
       "name": "amount_by_region",
-      "sql": "SELECT customer_profile.\"region_code\" AS \"region_code\", count(*) AS \"txn_count\", sum(transactions.\"amount\") AS \"total_amount\", avg(transactions.\"amount\") AS \"avg_amount\" FROM \"transactions\" AS transactions LEFT JOIN \"customer_profile\" AS customer_profile ON transactions.\"customer_id\" = customer_profile.\"customer_id\" GROUP BY customer_profile.\"region_code\""
+      "sql": "SELECT customer_profile.\"region_code\" AS \"region_code\", count(*) AS \"txn_count\", sum(transactions.\"amount\") AS \"total_amount\", avg(transactions.\"amount\") AS \"avg_amount\" FROM \"transactions\" AS transactions LEFT JOIN \"customer_profile\" AS customer_profile ON transactions.\"customer_id\" = customer_profile.\"customer_id\" GROUP BY customer_profile.\"region_code\"",
+      "table_chain": [
+        "transactions",
+        "customer_profile"
+      ]
     }
   ],
   "decisions": [
@@ -269,7 +277,8 @@
     "region.region_code",
     "region.region_name",
     "transactions.amount",
-    "transactions.customer_id"
+    "transactions.customer_id",
+    "transactions.txn_id"
   ],
   "source_version": "v2",
   "table_hashes": {

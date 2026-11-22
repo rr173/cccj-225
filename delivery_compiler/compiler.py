@@ -50,6 +50,7 @@ class PlannedDataset:
     joins: list               # relation names, in join order
     columns: list             # PlannedColumn
     sql: str
+    table_chain: list = None  # [base, joined_table, ...], in join order
 
 
 @dataclass
@@ -90,7 +91,7 @@ class Plan:
             "projection_version": self.projection_version,
             "datasets": [{
                 "name": d.name, "group_keys": d.group_keys, "base_table": d.base_table,
-                "joins": d.joins, "sql": d.sql,
+                "joins": d.joins, "table_chain": d.table_chain, "sql": d.sql,
                 "columns": [vars(c) for c in d.columns],
             } for d in self.datasets],
             "decisions": self.decisions,
@@ -104,7 +105,8 @@ class Plan:
         datasets = [PlannedDataset(
             name=ds["name"], group_keys=ds["group_keys"], base_table=ds["base_table"],
             joins=ds["joins"], sql=ds["sql"],
-            columns=[PlannedColumn(**c) for c in ds["columns"]])
+            columns=[PlannedColumn(**c) for c in ds["columns"]],
+            table_chain=ds.get("table_chain"))
             for ds in d["datasets"]]
         return cls(d["consumer"], d["purpose"], d["source_version"], d["table_hashes"],
                    d["policy_version"], d["lineage_version"], d["projection_version"],
@@ -239,6 +241,29 @@ def _compile_dataset(schema, rules, resolver, consumer, purpose, spec, ctx):
                     f"join key '{ep}' (relation '{r.name}') is denied for consumer "
                     f"'{consumer}'; cannot build the join path")
             ctx["scanned"].add(ep)
+
+    # ---- stable row keys must be declared and readable --------------------
+    # Row lineage identifies source records solely by these business keys, so
+    # every table participating in the dataset (base + join chain) must have a
+    # valid _row_keys declaration whose columns are not denied.
+    table_chain = [base] + [r.to_table for r in join_order]
+    for t in table_chain:
+        key_cols = schema.row_keys.get(t)
+        if not key_cols:
+            raise InvalidProjectionError(
+                f"table '{t}' has no stable row-key declaration (_row_keys); "
+                f"row lineage cannot identify its source records")
+        for kc in key_cols:
+            path = f"{t}.{kc}"
+            fi = schema.field(path)
+            d = resolve(rules, consumer, purpose, path, tags=fi.tags,
+                        via_ctx=via.get(t, ()))
+            if d.action == "deny":
+                raise InvalidProjectionError(
+                    f"row-key column '{path}' of table '{t}' is denied for "
+                    f"consumer '{consumer}'; provenance requires readable "
+                    f"stable row keys")
+            ctx["scanned"].add(path)
 
     # ---- group keys must be visible and projected --------------------------
     for gk in gks:
@@ -376,7 +401,8 @@ def _compile_dataset(schema, rules, resolver, consumer, purpose, spec, ctx):
     else:
         sql = "SELECT " + ", ".join(selects) + " " + sql
 
-    return PlannedDataset(name, gks, base, [r.name for r in join_order], columns, sql), via
+    return PlannedDataset(name, gks, base, [r.name for r in join_order], columns,
+                          sql, table_chain), via
 
 
 def _decision(ds_name, it, status, action, paths, matched, reason):
