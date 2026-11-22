@@ -17,7 +17,8 @@ delivery_compiler/          # 库 + CLI
   verifier.py               # 独立验证器（不导入编译器逻辑，自行重算一切，含逐行来源重算）
   reader.py                 # 读取接口（绑定消费者身份）+ 离线行来源查询（无需源库）
   history.py                # 消费者侧客户历史库（history-load / history-show）
-  __main__.py               # CLI: compile | preview | generate | verify | read | lineage | history-load | history-show
+  snapshot_correction.py    # 快照更正：JSONL 更正单 + 旧快照 -> 新源库（snapshot-correct）
+  __main__.py               # CLI: compile | preview | generate | verify | read | lineage | history-load | history-show | snapshot-correct
 demo/
   make_source.py            # 构造 customer_profile / transactions / region 三表（v1/v2，含 _row_keys 声明）
   configs/                  # 策略、血缘、投影（JSON）
@@ -26,6 +27,7 @@ demo/
 tests/
   test_history.py           # 客户历史库可复跑测试
   test_row_lineage.py       # 逐行来源：连接/复合键/重复投影/聚合全贡献者/手算预期/篡改/离线/有界内存
+  test_snapshot_correct.py  # 快照更正：整库迁移/顺序无关/归属整库校验/保留与清空/坏类型不发布/竞态发布/中断重试/有界内存
 ```
 
 ## 语义要点
@@ -160,6 +162,74 @@ python3 -m delivery_compiler lineage --package <pkg_dir> --dataset customers \
 不会把全部源行或贡献关系累积进 Python 内存（`tests/test_row_lineage.py` 用 30 万交易的
 运行时生成源 + `tracemalloc` 断言峰值有界）。包在 manifest、数据文件、来源清单全部写完并
 交叉校验前只存在于 `*.building` 暂存目录，成功后原子改名；失败不会覆盖既有不可变包。
+
+## 快照更正（snapshot-correct）
+
+交易归属更正（新建客户、客户迁区、撤掉空区域等）不在交付包里手工改，而是用
+一份更正单针对**已关闭、不再写入的旧快照**生成一个可直接用于下次交付的新源库；
+旧库原样保留，只处理演示的 `region`、`customer_profile`、`transactions` 三张
+业务表，不做模式变更，也不回放历史更正单。
+
+```bash
+python3 -m delivery_compiler snapshot-correct \
+  --source demo/source_v1.duckdb \
+  --source-sha256 "$(sha256sum demo/source_v1.duckdb | cut -d' ' -f1)" \
+  --corrections corrections.jsonl \
+  --new-version v3-corrected \
+  --out demo/source_v3.duckdb
+# => {"status": "generated", "out": ".../source_v3.duckdb", "new_version": "v3-corrected"}
+```
+
+### 更正单格式（UTF-8 JSONL，一行一条）
+
+每行用 `table`、`key`、`op` 指定业务表、按 `_row_keys` 声明填写的键对象和操作：
+
+```jsonl
+{"table": "region", "key": {"region_code": "R5"}, "op": "insert", "values": {"region_name": "Northeast", "country": "US", "tier": "T1"}}
+{"table": "customer_profile", "key": {"customer_id": 13}, "op": "insert", "values": {"full_name": "Mona Moore", "contact": {"email": "u13@corp.net", "phone": null}, "address": {"line1": null, "city": "Newville", "zip": "02100"}, "id_number": "GOV-1013", "segment": "A", "region_code": "R5", "created_at": "2024-03-01T09:00:00"}}
+{"table": "transactions", "key": {"txn_id": 1000}, "op": "update", "values": {"customer_id": 13}}
+{"table": "region", "key": {"region_code": "R4"}, "op": "delete"}
+```
+
+- **insert**：`values` 必须给齐全部非键列（可以显式写 `null`），键在旧表中必须
+  不存在。
+- **update**：`values` 只列需要替换的非键列；**没写的字段保留原值，不等于写
+  NULL**。键只能出现在 `key` 中，出现在 `values` 里（改键）按未知列拒绝。
+- **delete**：不带 `values`，键在旧表中必须存在。
+- **STRUCT 整体替换**：以整个顶层列为单位，JSON 对象的成员必须与现有 struct
+  成员完全一致（缺成员、多成员都拒绝）；成员可显式给 `null` 清空。
+- 按原列类型严格校验：时间戳/日期用 ISO 字符串（时间戳必须带时间部分），
+  数字字符串不能当数值，布尔不能当整数，`NaN`/`Infinity`、超范围整数、带时区
+  时间戳等无法精确表示的值一律拒绝。
+
+### 批次语义与整库校验
+
+更正单是针对同一个旧快照的**一批更正，不是有先后顺序的命令脚本**：
+
+- 同一个表键在一批中只允许出现一次；允许先列子行、后列它需要的新父行，调换
+  各行先后得到完全相同的业务结果。
+- 以施加整批更正后的库为准，检查**全部**行键（非 NULL、唯一）以及 `_relations`
+  里的两条关系（每笔交易的客户、每位客户的区域）：外键必须非 NULL 且唯一匹配
+  父行。因此删除父行时，任何**未被本批编辑**但仍引用它的子行都会导致整批拒绝；
+  只校验被编辑行是不够的。
+- 新库保持原表定义、`_row_keys` 键声明、`_field_tags` 字段标签和 `_relations`
+  关系声明不变，只更新业务数据和 `_snapshot` 版本，并额外写入一张
+  `_snapshot_correction` 表（旧库摘要、更正单原始字节 SHA-256、新版本），可被
+  现有 `compile` / `generate` / `verify` 直接使用。
+- 更正单逐行流式读取并暂存到 DuckDB，存在性与归属检查全部是集合 SQL，源数据
+  不会攒进 Python 内存。
+
+### 发布边界与幂等
+
+目标路径就是发布边界：
+
+- 源摘要不符、新版本与旧版本相同、任一更正无效或运行中断，都不会在目标位置
+  留下半成品，也不会覆盖任何已发布文件；临时库只存在于目标旁的私有暂存目录。
+- 发布通过**独占硬链接**原子完成，而不是"先看目标不存在、最后再覆盖"：两个进程
+  争用同一目标时只有先发布的完整结果能留下。
+- 相同请求（旧库摘要 + 更正单摘要 + 新版本三元组一致）在同一目标重试时认出
+  已发布结果并返回 `exists-identical`，不重写文件；即使上一次发布后来不及回报，
+  重试也能识别。请求不同而目标已被占用则报冲突。
 
 ## 消费者侧客户历史库（history-load / history-show）
 

@@ -1,0 +1,2 @@
+{"type": "package", "package_id": "pkg_34d81313c181d854"}
+{"type": "decision", "output": "everything", "status": "included", "action": "allow", "reason": "forged by attacker"}

@@ -1,0 +1,310 @@
+{
+  "consumer": "fraud_analyst",
+  "datasets": [
+    {
+      "base_table": "transactions",
+      "columns": [
+        {
+          "action": "allow",
+          "lineage": [
+            "transactions.txn_id"
+          ],
+          "matched_rules": [],
+          "name": "txn_id",
+          "reason": "no matching policy rule; default allow (permitted only because the field carries no sensitive tag)",
+          "sql": "transactions.\"txn_id\""
+        },
+        {
+          "action": "allow",
+          "lineage": [
+            "transactions.txn_time"
+          ],
+          "matched_rules": [],
+          "name": "txn_time",
+          "reason": "no matching policy rule; default allow (permitted only because the field carries no sensitive tag)",
+          "sql": "transactions.\"txn_time\""
+        },
+        {
+          "action": "allow",
+          "lineage": [
+            "transactions.channel"
+          ],
+          "matched_rules": [],
+          "name": "channel",
+          "reason": "no matching policy rule; default allow (permitted only because the field carries no sensitive tag)",
+          "sql": "transactions.\"channel\""
+        },
+        {
+          "action": "allow",
+          "lineage": [
+            "transactions.merchant_id"
+          ],
+          "matched_rules": [],
+          "name": "merchant_id",
+          "reason": "no matching policy rule; default allow (permitted only because the field carries no sensitive tag)",
+          "sql": "transactions.\"merchant_id\""
+        },
+        {
+          "action": "allow",
+          "lineage": [
+            "transactions.amount"
+          ],
+          "matched_rules": [
+            "f4"
+          ],
+          "name": "amount",
+          "reason": "matched rule f4 (allow, priority 20, path 'transactions.amount')",
+          "sql": "transactions.\"amount\""
+        },
+        {
+          "action": "allow",
+          "lineage": [
+            "customer_profile.customer_id"
+          ],
+          "matched_rules": [],
+          "name": "customer_id",
+          "reason": "no matching policy rule; default allow (permitted only because the field carries no sensitive tag)",
+          "sql": "customer_profile.\"customer_id\""
+        },
+        {
+          "action": "mask",
+          "lineage": [
+            "customer_profile.full_name"
+          ],
+          "matched_rules": [
+            "f1"
+          ],
+          "name": "full_name",
+          "reason": "matched rule f1 (mask, priority 10, tag 'pii')",
+          "sql": "substr(md5(cast(customer_profile.\"full_name\" as varchar)), 1, 10)"
+        },
+        {
+          "action": "allow",
+          "lineage": [
+            "customer_profile.contact.email"
+          ],
+          "matched_rules": [
+            "f2"
+          ],
+          "name": "email",
+          "reason": "matched rule f2 (allow, priority 30, path 'customer_profile.contact.email')",
+          "sql": "customer_profile.\"contact\"['email']"
+        },
+        {
+          "action": "allow",
+          "lineage": [
+            "customer_profile.region_code",
+            "region.region_name"
+          ],
+          "matched_rules": [],
+          "name": "region_label",
+          "reason": "derived field inherits the strictest restriction of its inputs: customer_profile.region_code -> allow (default allow); region.region_name -> allow (default allow)",
+          "sql": "concat(customer_profile.\"region_code\", '-', region.\"region_name\")"
+        }
+      ],
+      "group_keys": [],
+      "joins": [
+        "txn_cust",
+        "cust_region"
+      ],
+      "name": "txn_enriched",
+      "sql": "SELECT transactions.\"txn_id\" AS \"txn_id\", transactions.\"txn_time\" AS \"txn_time\", transactions.\"channel\" AS \"channel\", transactions.\"merchant_id\" AS \"merchant_id\", transactions.\"amount\" AS \"amount\", customer_profile.\"customer_id\" AS \"customer_id\", substr(md5(cast(customer_profile.\"full_name\" as varchar)), 1, 10) AS \"full_name\", customer_profile.\"contact\"['email'] AS \"email\", concat(customer_profile.\"region_code\", '-', region.\"region_name\") AS \"region_label\" FROM \"transactions\" AS transactions LEFT JOIN \"customer_profile\" AS customer_profile ON transactions.\"customer_id\" = customer_profile.\"customer_id\" LEFT JOIN \"region\" AS region ON customer_profile.\"region_code\" = region.\"region_code\"",
+      "table_chain": [
+        "transactions",
+        "customer_profile",
+        "region"
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "action": "allow",
+      "dataset": "txn_enriched",
+      "lineage": [
+        "transactions.txn_id"
+      ],
+      "matched_rules": [],
+      "output": "txn_id",
+      "reason": "no matching policy rule; default allow (permitted only because the field carries no sensitive tag)",
+      "status": "included"
+    },
+    {
+      "action": "allow",
+      "dataset": "txn_enriched",
+      "lineage": [
+        "transactions.txn_time"
+      ],
+      "matched_rules": [],
+      "output": "txn_time",
+      "reason": "no matching policy rule; default allow (permitted only because the field carries no sensitive tag)",
+      "status": "included"
+    },
+    {
+      "action": "allow",
+      "dataset": "txn_enriched",
+      "lineage": [
+        "transactions.channel"
+      ],
+      "matched_rules": [],
+      "output": "channel",
+      "reason": "no matching policy rule; default allow (permitted only because the field carries no sensitive tag)",
+      "status": "included"
+    },
+    {
+      "action": "allow",
+      "dataset": "txn_enriched",
+      "lineage": [
+        "transactions.merchant_id"
+      ],
+      "matched_rules": [],
+      "output": "merchant_id",
+      "reason": "no matching policy rule; default allow (permitted only because the field carries no sensitive tag)",
+      "status": "included"
+    },
+    {
+      "action": "allow",
+      "dataset": "txn_enriched",
+      "lineage": [
+        "transactions.amount"
+      ],
+      "matched_rules": [
+        "f4"
+      ],
+      "output": "amount",
+      "reason": "matched rule f4 (allow, priority 20, path 'transactions.amount')",
+      "status": "included"
+    },
+    {
+      "action": "allow",
+      "dataset": "txn_enriched",
+      "lineage": [
+        "customer_profile.customer_id"
+      ],
+      "matched_rules": [],
+      "output": "customer_id",
+      "reason": "no matching policy rule; default allow (permitted only because the field carries no sensitive tag)",
+      "status": "included"
+    },
+    {
+      "action": "mask",
+      "dataset": "txn_enriched",
+      "lineage": [
+        "customer_profile.full_name"
+      ],
+      "matched_rules": [
+        "f1"
+      ],
+      "output": "full_name",
+      "reason": "matched rule f1 (mask, priority 10, tag 'pii')",
+      "status": "included"
+    },
+    {
+      "action": "allow",
+      "dataset": "txn_enriched",
+      "lineage": [
+        "customer_profile.contact.email"
+      ],
+      "matched_rules": [
+        "f2"
+      ],
+      "output": "email",
+      "reason": "matched rule f2 (allow, priority 30, path 'customer_profile.contact.email')",
+      "status": "included"
+    },
+    {
+      "action": "allow",
+      "dataset": "txn_enriched",
+      "lineage": [
+        "customer_profile.region_code",
+        "region.region_name"
+      ],
+      "matched_rules": [],
+      "output": "region_label",
+      "reason": "derived field inherits the strictest restriction of its inputs: customer_profile.region_code -> allow (default allow); region.region_name -> allow (default allow)",
+      "status": "included"
+    },
+    {
+      "action": "deny",
+      "dataset": "txn_enriched",
+      "lineage": [
+        "customer_profile.id_number"
+      ],
+      "matched_rules": [
+        "f3"
+      ],
+      "output": "id_number",
+      "reason": "deny rule f3 (priority 90, path 'customer_profile.id_number') stands; best non-deny rule f1 (mask, priority 10, tag 'pii') cannot lift it -- a deny is only lifted by a higher-priority explicit path rule; denied fields are not published",
+      "status": "excluded"
+    },
+    {
+      "action": "deny",
+      "dataset": "txn_enriched",
+      "lineage": [
+        "region.tier"
+      ],
+      "matched_rules": [
+        "f5"
+      ],
+      "output": "tier",
+      "reason": "deny rule f5 (priority 15, tag 'internal') is the only matching rule; denied fields are not published",
+      "status": "excluded"
+    },
+    {
+      "action": "deny",
+      "dataset": "txn_enriched",
+      "lineage": [
+        "customer_profile.id_number",
+        "transactions.amount"
+      ],
+      "matched_rules": [
+        "f3",
+        "f4"
+      ],
+      "output": "risk_label",
+      "reason": "derived field inherits the strictest restriction of its inputs: customer_profile.id_number -> deny (rule f3); transactions.amount -> allow (rule f4); denied fields are not published",
+      "status": "excluded"
+    }
+  ],
+  "excluded_outputs": [
+    "id_number",
+    "risk_label",
+    "tier"
+  ],
+  "forbidden_paths": [
+    "customer_profile.id_number",
+    "region.tier"
+  ],
+  "lineage_version": "83d0bc3e8d62a40944883c7e29fc562d3bc87d4fc67bfb46cff0e852e803ce54",
+  "policy_version": "cfffe7645c3d41a61dce331e57dcb400fd2f36ee065704ddf625f4d67d9b18c5",
+  "projection_version": "1e82e082ca92740a44c2c5610e90946ea445b8c622ea48fa9e3d5c3e701a3ace",
+  "purpose": "fraud",
+  "scanned_columns": [
+    "customer_profile.contact.email",
+    "customer_profile.customer_id",
+    "customer_profile.full_name",
+    "customer_profile.region_code",
+    "region.region_code",
+    "region.region_name",
+    "transactions.amount",
+    "transactions.channel",
+    "transactions.customer_id",
+    "transactions.merchant_id",
+    "transactions.txn_id",
+    "transactions.txn_time"
+  ],
+  "source_version": "v1",
+  "table_hashes": {
+    "customer_profile": {
+      "hash": "13238936026150342350",
+      "rows": 12
+    },
+    "region": {
+      "hash": "14792771455518843536",
+      "rows": 4
+    },
+    "transactions": {
+      "hash": "14038548839521102415",
+      "rows": 40
+    }
+  }
+}

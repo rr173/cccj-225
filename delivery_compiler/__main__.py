@@ -1,4 +1,4 @@
-"""CLI: python -m delivery_compiler <compile|preview|generate|verify|read|history-load|history-show>"""
+"""CLI: python -m delivery_compiler <compile|preview|generate|verify|read|lineage|history-load|history-show|snapshot-correct>"""
 from __future__ import annotations
 
 import argparse
@@ -13,6 +13,7 @@ from .history import connect as history_connect
 from .history import load_package, show_history
 from .reader import lookup_row_lineage, read_package
 from .schema import SourceSchema
+from .snapshot_correction import correct_snapshot
 from .verifier import verify_package
 
 
@@ -78,6 +79,21 @@ def main(argv=None):
                    help="only use ingestions with seq <= upto "
                         "(default: latest; 0 = nothing ingested yet)")
 
+    p = sub.add_parser(
+        "snapshot-correct",
+        help="build a corrected source snapshot from a JSONL correction sheet")
+    p.add_argument("--source", required=True,
+                   help="closed, no-longer-written old snapshot .duckdb file")
+    p.add_argument("--source-sha256", required=True,
+                   help="expected SHA-256 hex digest of --source")
+    p.add_argument("--corrections", required=True,
+                   help="UTF-8 JSONL correction sheet")
+    p.add_argument("--new-version", required=True,
+                   help="non-empty version for the new snapshot (must differ "
+                        "from the old version)")
+    p.add_argument("--out", required=True,
+                   help="target .duckdb path; never overwritten")
+
     args = ap.parse_args(argv)
     try:
         if args.cmd in ("compile", "preview", "generate"):
@@ -127,6 +143,13 @@ def main(argv=None):
             finally:
                 con.close()
             print(json.dumps(result, ensure_ascii=False, indent=2))
+        elif args.cmd == "snapshot-correct":
+            out, status = correct_snapshot(
+                args.source, args.corrections, args.source_sha256,
+                args.new_version, args.out)
+            print(json.dumps(
+                {"status": status, "out": str(out),
+                 "new_version": args.new_version}, ensure_ascii=False))
         return 0
     except DeliveryError as e:
         print(f"error: {type(e).__name__}: {e}", file=sys.stderr)

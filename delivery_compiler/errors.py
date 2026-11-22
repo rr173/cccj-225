@@ -64,3 +64,15 @@ class HistoryError(DeliveryError):
     failures. A failed load never consumes an ingestion sequence number and
     never leaves partial state behind.
     """
+
+
+class CorrectionError(DeliveryError):
+    """A snapshot correction sheet or correction request is invalid.
+
+    Raised for malformed JSONL lines, unknown tables/columns/operations,
+    illegal keys or key changes, values that do not match the declared column
+    types (numeric strings, unrepresentable timestamps, wrong struct members),
+    duplicate table keys within one batch, insert/update/delete precondition
+    failures, and post-correction referential integrity violations. Nothing is
+    published at the target path when this is raised.
+    """

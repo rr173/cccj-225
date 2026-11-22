@@ -1,0 +1,251 @@
+{
+  "compiler_attestation": {
+    "note": "compiler self-attestation; verifiers MUST NOT trust this",
+    "self_check": "passed"
+  },
+  "consumer": "marketing",
+  "datasets": [
+    {
+      "base_table": "customer_profile",
+      "columns": [
+        {
+          "action": "allow",
+          "lineage": [
+            "customer_profile.customer_id"
+          ],
+          "matched_rules": [],
+          "name": "customer_id",
+          "reason": "no matching policy rule; default allow (permitted only because the field carries no sensitive tag)",
+          "transform": "customer_profile.\"customer_id\""
+        },
+        {
+          "action": "allow",
+          "lineage": [
+            "customer_profile.contact.email"
+          ],
+          "matched_rules": [
+            "m2"
+          ],
+          "name": "email_masked",
+          "reason": "explicit path rule m2 (mask, priority 20) lifts deny rule m1 (priority 10, path 'customer_profile.contact')",
+          "transform": "concat('u_', substr(md5(cast(customer_profile.\"contact\"['email'] as varchar)), 1, 8), '@', split_part(cast(customer_profile.\"contact\"['email'] as varchar), '@', 2))"
+        },
+        {
+          "action": "allow",
+          "lineage": [
+            "customer_profile.address.city"
+          ],
+          "matched_rules": [
+            "m8"
+          ],
+          "name": "city",
+          "reason": "explicit path rule m8 (allow, priority 20) lifts deny rule m7 (priority 10, path 'customer_profile.address')",
+          "transform": "customer_profile.\"address\"['city']"
+        },
+        {
+          "action": "allow",
+          "lineage": [
+            "customer_profile.segment"
+          ],
+          "matched_rules": [],
+          "name": "segment",
+          "reason": "no matching policy rule; default allow (permitted only because the field carries no sensitive tag)",
+          "transform": "customer_profile.\"segment\""
+        },
+        {
+          "action": "allow",
+          "lineage": [
+            "customer_profile.region_code",
+            "region.region_name"
+          ],
+          "matched_rules": [],
+          "name": "region_label",
+          "reason": "derived field inherits the strictest restriction of its inputs: customer_profile.region_code -> allow (default allow); region.region_name -> allow (default allow)",
+          "transform": "concat(customer_profile.\"region_code\", '-', region.\"region_name\")"
+        }
+      ],
+      "file": "customers.parquet",
+      "group_keys": [],
+      "joins": [
+        "cust_region"
+      ],
+      "name": "customers",
+      "row_lineage": {
+        "file": "customers.row_lineage.jsonl",
+        "format": "row-lineage/1",
+        "sha256": "d85e82e14751af5e712fb85118ce04e1735661b71229d8c43d4d20ddacf86620"
+      },
+      "sha256": "ba9c656019c52676c0c4a1d4338855b9be1df1abb2fb0e659cc7b97bad5b0895",
+      "table_chain": [
+        "customer_profile",
+        "region"
+      ]
+    },
+    {
+      "base_table": "transactions",
+      "columns": [
+        {
+          "action": "allow",
+          "lineage": [
+            "customer_profile.region_code"
+          ],
+          "matched_rules": [],
+          "name": "region_code",
+          "reason": "no matching policy rule; default allow (permitted only because the field carries no sensitive tag)",
+          "transform": "customer_profile.\"region_code\""
+        },
+        {
+          "action": "aggregate",
+          "lineage": [],
+          "matched_rules": [],
+          "name": "txn_count",
+          "reason": "no inputs",
+          "transform": "count(*)"
+        },
+        {
+          "action": "aggregate",
+          "lineage": [
+            "transactions.amount"
+          ],
+          "matched_rules": [
+            "m5"
+          ],
+          "name": "total_amount",
+          "reason": "matched rule m5 (aggregate, priority 30, path 'transactions.amount')",
+          "transform": "sum(transactions.\"amount\")"
+        },
+        {
+          "action": "aggregate",
+          "lineage": [
+            "transactions.amount"
+          ],
+          "matched_rules": [
+            "m5"
+          ],
+          "name": "avg_amount",
+          "reason": "matched rule m5 (aggregate, priority 30, path 'transactions.amount')",
+          "transform": "avg(transactions.\"amount\")"
+        }
+      ],
+      "file": "amount_by_region.parquet",
+      "group_keys": [
+        "customer_profile.region_code"
+      ],
+      "joins": [
+        "txn_cust"
+      ],
+      "name": "amount_by_region",
+      "row_lineage": {
+        "file": "amount_by_region.row_lineage.jsonl",
+        "format": "row-lineage/1",
+        "sha256": "825cc52160832dd568942572c4a416fbcc38fc023cadd6c11bad08fca9347e8b"
+      },
+      "sha256": "1034603e84b5837fc82fc9c8fae512df411dc878a0fb21939062d1d87bf79ab9",
+      "table_chain": [
+        "transactions",
+        "customer_profile"
+      ]
+    }
+  ],
+  "excluded_outputs": [
+    "risk_label"
+  ],
+  "forbidden_paths": [
+    "customer_profile.address.line1",
+    "customer_profile.address.zip",
+    "customer_profile.contact.phone",
+    "customer_profile.id_number",
+    "region.tier"
+  ],
+  "format": "delivery-package/1",
+  "identity": {
+    "consumer": "marketing",
+    "lineage_version": "83d0bc3e8d62a40944883c7e29fc562d3bc87d4fc67bfb46cff0e852e803ce54",
+    "policy_version": "e2791df7bc14480453557c6515a354a1b120f10ac194445ea6c15687fc970885",
+    "projection_version": "e5f18606ecb58eb497ed35c53c286bc3265a27ebfe1a06843b47b2643abb7a33",
+    "purpose": "analytics",
+    "source": {
+      "tables": {
+        "customer_profile": {
+          "hash": "13238936026150342350",
+          "rows": 12
+        },
+        "region": {
+          "hash": "14792771455518843536",
+          "rows": 4
+        },
+        "transactions": {
+          "hash": "14038548839521102415",
+          "rows": 40
+        }
+      },
+      "version": "v1"
+    }
+  },
+  "lineage_version": "83d0bc3e8d62a40944883c7e29fc562d3bc87d4fc67bfb46cff0e852e803ce54",
+  "package_id": "pkg_34d81313c181d854",
+  "policy_version": "e2791df7bc14480453557c6515a354a1b120f10ac194445ea6c15687fc970885",
+  "projection_version": "e5f18606ecb58eb497ed35c53c286bc3265a27ebfe1a06843b47b2643abb7a33",
+  "purpose": "analytics",
+  "row_key_declarations": {
+    "customer_profile": {
+      "columns": [
+        "customer_id"
+      ]
+    },
+    "region": {
+      "columns": [
+        "region_code"
+      ]
+    },
+    "transactions": {
+      "columns": [
+        "txn_id"
+      ]
+    }
+  },
+  "scanned_columns": [
+    "customer_profile.address.city",
+    "customer_profile.contact.email",
+    "customer_profile.customer_id",
+    "customer_profile.region_code",
+    "customer_profile.segment",
+    "region.region_code",
+    "region.region_name",
+    "transactions.amount",
+    "transactions.customer_id",
+    "transactions.txn_id"
+  ],
+  "source": {
+    "tables": {
+      "customer_profile": {
+        "hash": "13238936026150342350",
+        "rows": 12
+      },
+      "region": {
+        "hash": "14792771455518843536",
+        "rows": 4
+      },
+      "transactions": {
+        "hash": "14038548839521102415",
+        "rows": 40
+      }
+    },
+    "version": "v1"
+  },
+  "stats": {
+    "datasets": {
+      "amount_by_region": {
+        "groups": 4,
+        "lineage_entries": 4,
+        "lineage_source_refs": 51,
+        "rows": 4
+      },
+      "customers": {
+        "lineage_entries": 12,
+        "lineage_source_refs": 24,
+        "rows": 12
+      }
+    }
+  }
+}

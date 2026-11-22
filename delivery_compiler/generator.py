@@ -100,12 +100,18 @@ def _cross_check_package(con, tmp, plan, schema, lineage_files):
             raise RuntimeError(
                 f"row-lineage self-check failed for dataset {ds.name!r}: lineage "
                 f"published values do not match the parquet rows")
-        # Deterministic order follows the lineage SQL ORDER BY over the join
-        # chain's row-key links. The base table has a unique stable row key, so
-        # the base-table source ref is unique per output row and monotonic in
-        # the emitted order; joined-table keys may legitimately change between
-        # consecutive base rows and must not be used as the ordering key.
+        # Deterministic order follows the lineage SQL ORDER BY. Row-level
+        # datasets follow the base table's unique row-key link; grouped
+        # datasets follow their (sorted) group-key output values. The
+        # comparison uses typed values, never JSON text ("10" < "9" and
+        # "R10" < "R5" as strings).
         base_table = ds.base_table
+        if ds.group_keys:
+            name_by_lineage = {}
+            for c in ds.columns:
+                for ln in c.lineage:
+                    name_by_lineage[ln] = c.name
+            gk_output_names = [name_by_lineage[gk] for gk in ds.group_keys]
         prev_key = None
         for entry in read_entries(lin_path):
             values, sources = entry.get("values"), entry.get("sources")
@@ -122,11 +128,13 @@ def _cross_check_package(con, tmp, plan, schema, lineage_files):
                 raise RuntimeError(
                     f"row-lineage self-check failed for dataset {ds.name!r}: "
                     f"sources are not sorted and de-duplicated")
-            base_ref = next((s for s in sources if s["table"] == base_table), None)
-            # order by typed key values (not their JSON text, which sorts
-            # lexicographically: "10" < "9"); base key columns are stable
-            order_key = tuple(sorted(base_ref["key"].items())) \
-                if base_ref else None
+            if ds.group_keys:
+                order_key = tuple((g, values.get(g)) for g in gk_output_names)
+            else:
+                base_ref = next((s for s in sources if s["table"] == base_table),
+                                None)
+                order_key = tuple(sorted(base_ref["key"].items())) \
+                    if base_ref else None
             if prev_key is not None and order_key < prev_key:
                 raise RuntimeError(
                     f"row-lineage self-check failed for dataset {ds.name!r}: "
